@@ -5,35 +5,40 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.security.servlet.PathRequest;
-import org.springframework.boot.autoconfigure.security.servlet.StaticResourceRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.MessageChannel;
+import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.messaging.simp.stomp.StompCommand;
+import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.messaging.support.ChannelInterceptor;
+import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
+import java.security.Principal;
+
 @SpringBootApplication
-@EnableWebSecurity
 public class SpringOauth2ResourceserverWebsocketApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(SpringOauth2ResourceserverWebsocketApplication.class, args);
-	}
-
-	@Bean
-	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-		http
-				.authorizeHttpRequests(authorize -> authorize
-						.requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
-						.anyRequest().authenticated()
-				)
-				.oauth2ResourceServer((oauth2) -> oauth2.jwt(Customizer.withDefaults()));
-		return http.build();
 	}
 }
 
@@ -42,7 +47,7 @@ public class SpringOauth2ResourceserverWebsocketApplication {
 @RequiredArgsConstructor
 @Slf4j
 class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer {
-
+	private final JwtDecoder jwtDecoder;
 	@Override
 	public void registerStompEndpoints(StompEndpointRegistry registry) {
 		registry.addEndpoint("/stomp-endpoint")
@@ -57,5 +62,66 @@ class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer {
 		// STOMP messages whose destination header begins with /app are routed to @MessageMapping methods in @Controller classes
 		registry.setApplicationDestinationPrefixes("/app");
 		registry.setUserDestinationPrefix("/user");
+	}
+
+	@Override
+	public void configureClientInboundChannel(ChannelRegistration registration) {
+		registration.interceptors(new ChannelInterceptor() {
+			@Override
+			public Message<?> preSend(Message<?> message, MessageChannel channel) {
+				StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+				if (StompCommand.CONNECT.equals(accessor.getCommand())) {
+					String authHeader = accessor.getFirstNativeHeader(HttpHeaders.AUTHORIZATION);
+					log.info("###Authorization header received: {}", authHeader);
+					if (authHeader != null && authHeader.startsWith("Bearer ")) {
+						String token = authHeader.substring(7);
+						try {
+							Jwt jwt = jwtDecoder.decode(token);
+							Authentication auth = new JwtAuthenticationToken(jwt);
+							accessor.setUser(auth);  // Set authentication in WebSocket session
+						} catch (JwtException e) {
+							throw new IllegalArgumentException("Invalid JWT Token");
+						}
+					} else {
+						throw new IllegalArgumentException("Missing Authorization Header");
+					}
+				}
+				return message;
+			}
+		});
+	}
+}
+
+
+@Configuration
+@EnableWebSecurity
+class SecurityConfig {
+
+	@Bean
+	public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+		http
+				.authorizeHttpRequests(authorize -> authorize
+						.requestMatchers("/stomp-endpoint/**").permitAll()
+						.requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
+						.anyRequest().authenticated()
+				)
+				.oauth2ResourceServer((oauth2) -> oauth2.jwt(Customizer.withDefaults()));
+		return http.build();
+	}
+
+	/*@Bean
+	public JwtDecoder jwtDecoder() {
+		return NimbusJwtDecoder.withJwkSetUri("http://localhost:9000/oauth2/jwks").build();
+	}*/
+}
+
+@Controller
+@Slf4j
+class WebSocketController {
+	@MessageMapping("/chat")
+	@SendTo("/topic/public")
+	public String processMessage(Principal principal, String message) {
+		log.info("####Principle: {}", principal);
+		return message + " from " + principal.getName();
 	}
 }
