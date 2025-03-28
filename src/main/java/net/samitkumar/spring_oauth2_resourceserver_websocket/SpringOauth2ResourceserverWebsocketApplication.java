@@ -8,10 +8,13 @@ import org.springframework.boot.autoconfigure.security.servlet.PathRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.messaging.simp.stomp.StompCommand;
@@ -28,6 +31,7 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
@@ -80,15 +84,24 @@ class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer {
 							Authentication auth = new JwtAuthenticationToken(jwt);
 							accessor.setUser(auth);  // Set authentication in WebSocket session
 						} catch (JwtException e) {
-							throw new IllegalArgumentException("Invalid JWT Token");
+							accessor.setUser(null);
+							throw new ForbiddenException("Invalid JWT Token");
 						}
 					} else {
-						throw new IllegalArgumentException("Missing Authorization Header");
+						accessor.setUser(null);
+						throw new ForbiddenException("Missing Authorization Header");
 					}
 				}
 				return message;
 			}
 		});
+	}
+}
+
+@ResponseStatus(HttpStatus.FORBIDDEN)
+class ForbiddenException extends RuntimeException {
+	public ForbiddenException(String message) {
+		super(message);
 	}
 }
 
@@ -108,20 +121,30 @@ class SecurityConfig {
 				.oauth2ResourceServer((oauth2) -> oauth2.jwt(Customizer.withDefaults()));
 		return http.build();
 	}
-
-	/*@Bean
-	public JwtDecoder jwtDecoder() {
-		return NimbusJwtDecoder.withJwkSetUri("http://localhost:9000/oauth2/jwks").build();
-	}*/
 }
+
+record UserMessage(String message, String to, String from) {}
 
 @Controller
 @Slf4j
+@RequiredArgsConstructor
 class WebSocketController {
+	final SimpMessagingTemplate simpMessagingTemplate;
+
 	@MessageMapping("/chat")
 	@SendTo("/topic/public")
-	public String processMessage(Principal principal, String message) {
-		log.info("####Principle: {}", principal);
-		return message + " from " + principal.getName();
+	public UserMessage processMessage(Principal principal, UserMessage message) {
+		log.info("####Public Message {} from {}", message, principal);
+		return new UserMessage(message.message(), "ALL", principal.getName());
+	}
+
+	@MessageMapping("/chat/private")
+	@SendToUser("/queue/private")
+	public UserMessage processPrivateMessage(Principal principal, UserMessage message) {
+		log.info("####Private Message {} from {}", message, principal);
+		var messageToSender = new UserMessage(message.message(), principal.getName(), principal.getName());
+		var messageToReceiver = new UserMessage(message.message(), message.to(), principal.getName());
+		simpMessagingTemplate.convertAndSendToUser(message.to(), "/queue/private", messageToReceiver);
+		return messageToSender;
 	}
 }
