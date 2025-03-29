@@ -20,6 +20,7 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -84,12 +85,23 @@ class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer {
 							Authentication auth = new JwtAuthenticationToken(jwt);
 							accessor.setUser(auth);  // Set authentication in WebSocket session
 						} catch (JwtException e) {
-							accessor.setUser(null);
-							throw new ForbiddenException("Invalid JWT Token");
+
+							// Send STOMP ERROR frame to client
+							StompHeaderAccessor errorAccessor = StompHeaderAccessor.create(StompCommand.ERROR);
+							errorAccessor.setMessage("JWT Token is expired or invalid");
+							errorAccessor.setLeaveMutable(true);
+
+							return MessageBuilder.createMessage(errorAccessor.getMessage(), errorAccessor.getMessageHeaders());
+							//throw new ForbiddenException("Invalid JWT Token");
 						}
 					} else {
-						accessor.setUser(null);
-						throw new ForbiddenException("Missing Authorization Header");
+						// Send STOMP ERROR frame for missing token
+						StompHeaderAccessor errorAccessor = StompHeaderAccessor.create(StompCommand.ERROR);
+						errorAccessor.setMessage("Missing Authorization Header");
+						errorAccessor.setLeaveMutable(true);
+
+						return MessageBuilder.createMessage(errorAccessor.getMessage(), errorAccessor.getMessageHeaders());
+						//throw new ForbiddenException("Missing Authorization Header");
 					}
 				}
 				return message;
