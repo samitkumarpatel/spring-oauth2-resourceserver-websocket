@@ -32,12 +32,16 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
 import java.security.Principal;
+import java.util.Map;
 
 @SpringBootApplication
 public class SpringOauth2ResourceserverWebsocketApplication {
@@ -132,6 +136,7 @@ class SecurityConfig {
 				)
 				.oauth2ResourceServer((oauth2) -> oauth2.jwt(Customizer.withDefaults()));
 		return http
+				.cors(Customizer.withDefaults())
 				.build();
 	}
 }
@@ -143,6 +148,15 @@ record UserMessage(String message, String to, String from) {}
 @RequiredArgsConstructor
 class WebSocketController {
 	final SimpMessagingTemplate simpMessagingTemplate;
+	final JwtDecoder jwtDecoder;
+
+	@GetMapping("/who-am-i")
+	@CrossOrigin(originPatterns = "*")
+	@ResponseBody
+	Map<String, Object> whoAmI(Principal principal) {
+		var jwt = (Jwt) ((JwtAuthenticationToken) principal).getToken();
+		return jwt.getClaims();
+	}
 
 	@MessageMapping("/chat")
 	@SendTo("/topic/public")
