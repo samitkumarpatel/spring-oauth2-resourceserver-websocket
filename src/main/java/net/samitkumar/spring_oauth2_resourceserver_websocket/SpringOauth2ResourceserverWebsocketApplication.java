@@ -131,7 +131,8 @@ class SecurityConfig {
 						.anyRequest().authenticated()
 				)
 				.oauth2ResourceServer((oauth2) -> oauth2.jwt(Customizer.withDefaults()));
-		return http.build();
+		return http
+				.build();
 	}
 }
 
