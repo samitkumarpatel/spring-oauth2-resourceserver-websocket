@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.security.servlet.PathRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.messaging.Message;
@@ -39,15 +40,33 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.web.socket.messaging.SessionConnectEvent;
+import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.security.Principal;
 import java.util.Map;
+import java.util.Objects;
 
 @SpringBootApplication
+@RequiredArgsConstructor
 public class SpringOauth2ResourceserverWebsocketApplication {
+
+	final SimpMessagingTemplate simpMessagingTemplate;
 
 	public static void main(String[] args) {
 		SpringApplication.run(SpringOauth2ResourceserverWebsocketApplication.class, args);
+	}
+
+	@EventListener
+	public void onSessionConnect(SessionConnectEvent event) {
+		var user = Objects.requireNonNull(event.getUser()).getName();
+		simpMessagingTemplate.convertAndSend("/topic/public", new OutboundMessage(Event.CONNECT, new Payload("User " + user + " joined", "ALL", "SYSTEM")));
+	}
+
+	@EventListener
+	public void onSessionDisconnect(SessionDisconnectEvent event) {
+		var user = Objects.requireNonNull(event.getUser()).getName();
+		simpMessagingTemplate.convertAndSend("/topic/public", new OutboundMessage(Event.DISCONNECT, new Payload("User " + user + " left", "ALL", "SYSTEM")));
 	}
 }
 
@@ -141,7 +160,12 @@ class SecurityConfig {
 	}
 }
 
-record UserMessage(String message, String to, String from) {}
+enum Event {
+	CONNECT, DISCONNECT, MESSAGE
+}
+record InboundMessage(String message, String to) {}
+record OutboundMessage(Event event, Payload payload) {}
+record Payload(String message, String to, String from) {}
 
 @Controller
 @Slf4j
