@@ -6,6 +6,7 @@ import org.springframework.data.repository.ListCrudRepository;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface UserMessageRepository extends ListCrudRepository<UserMessage, Long> {
 
@@ -23,11 +24,11 @@ public interface UserMessageRepository extends ListCrudRepository<UserMessage, L
     List<UserMessage> findMessagesBetweenUsers(@Param("userId1") Long userId1, @Param("userId2") Long userId2);
 
     @Query("""
-    SELECT COUNT(*)
-    FROM messages m
-    WHERE m.receiver_id = :receiverId AND m.is_read = FALSE
+        SELECT COUNT(*)
+        FROM messages m
+        WHERE m.sender_id = :me AND m.receiver_id = :you AND m.is_read = FALSE
     """)
-    Long countUnreadMessage(@Param("receiverId") Long receiverId);
+    Long countUnreadMessage(@Param("me") Long me, @Param("you") Long you);
 
     @Modifying
     @Query("UPDATE messages SET is_read = TRUE WHERE id = :id")
