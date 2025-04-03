@@ -161,11 +161,17 @@ class SecurityConfig {
 }
 
 enum Event {
-	CONNECT, DISCONNECT, MESSAGE
+	CONNECT,
+	DISCONNECT,
+	MESSAGE_TO_ALL,
+	MESSAGE_FROM_USER,
+	MESSAGE_FROM_GROUP,
+	MESSAGE_TO_USER,
+	MESSAGE_TO_GROUP
 }
-record InboundMessage(String message, String to) {}
+record InboundMessage(String message, String from, String to) {}
 record OutboundMessage(Event event, Payload payload) {}
-record Payload(String message, String to, String from) {}
+record Payload(String message, String from, String to) {}
 
 @Controller
 @Slf4j
@@ -184,18 +190,28 @@ class WebSocketController {
 
 	@MessageMapping("/chat")
 	@SendTo("/topic/public")
-	public UserMessage processMessage(Principal principal, UserMessage message) {
+	public OutboundMessage processMessage(Principal principal, InboundMessage message) {
 		log.info("####Public Message {} from {}", message, principal);
-		return new UserMessage(message.message(), "ALL", principal.getName());
+		return new OutboundMessage(
+				Event.MESSAGE_TO_ALL,
+				new Payload(message.message(), principal.getName(), "ALL")
+		);
 	}
 
 	@MessageMapping("/chat/private")
 	@SendToUser("/queue/private")
-	public UserMessage processPrivateMessage(Principal principal, UserMessage message) {
+	public OutboundMessage processPrivateMessage(Principal principal, InboundMessage message) {
 		log.info("####Private Message {} from {}", message, principal);
-		var messageToSender = new UserMessage(message.message(), principal.getName(), principal.getName());
-		var messageToReceiver = new UserMessage(message.message(), message.to(), principal.getName());
+		var messageToSender = new OutboundMessage(
+				Event.MESSAGE_TO_USER,
+				new Payload(message.message(), principal.getName(), principal.getName())
+		);
+		var messageToReceiver = new OutboundMessage(
+				Event.MESSAGE_FROM_USER,
+				new Payload(message.message(), principal.getName(), message.to())
+		);
 		simpMessagingTemplate.convertAndSendToUser(message.to(), "/queue/private", messageToReceiver);
 		return messageToSender;
 	}
 }
+
