@@ -2,36 +2,40 @@ package net.samitkumar.spring_oauth2_resourceserver_websocket;
 
 import net.samitkumar.spring_oauth2_resourceserver_websocket.db.UserMessage;
 import net.samitkumar.spring_oauth2_resourceserver_websocket.db.UserMessageRepository;
-import org.junit.experimental.results.ResultMatchers;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.RequestBuilder;
-import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 
 @SpringBootTest
 @Import(TestcontainersConfiguration.class)
+@AutoConfigureMockMvc
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class SpringOauth2ResourceserverWebsocketApplicationTests {
 
 	@Autowired
 	UserMessageRepository userMessageRepository;
+	@Autowired
+	MockMvc mockMvc;
 
 	@Test
 	void contextLoads() {
 	}
 
 	@Test
-	@WithMockUser
+	@DisplayName("Test DB schema")
+	@Order(1)
 	void dbSchemaTest() {
 		assertAll(
 				() -> userMessageRepository
@@ -58,18 +62,32 @@ class SpringOauth2ResourceserverWebsocketApplicationTests {
 	}
 
 	@Test
-	@WithMockUser
-	void apiEndpointTest(MockMvc mockMvc) throws Exception {
+	@DisplayName("Test API endpoint")
+	@Order(2)
+	void apiEndpointTest() throws Exception {
 		mockMvc.perform(MockMvcRequestBuilders
 						.post("/message")
+						.with(SecurityMockMvcRequestPostProcessors
+								.jwt()
+								.jwt(jwt -> jwt.claims(claims -> {
+									claims.put("sub", "Bret");
+									claims.put("authorities", List.of("ROLE_USER"));
+								})))
 						.contentType("application/json")
 						.content("""
 								{
-									"senderId": 1,
 									"receiverId": 2,
-									"content": "Hello"
+									"content": "Hello from api"
 								}
-								""").accept("application/json"));
+								""")
+						.accept("application/json")
+				)
+				.andExpect(MockMvcResultMatchers.status().isOk())
+				.andExpect(MockMvcResultMatchers.jsonPath("$.id").exists())
+				/*.andExpect(MockMvcResultMatchers.content().json("""
+					{"id":1,"senderId":1,"receiverId":2,"content":"Hello from api","createdAt":null,"isRead":null}
+				"""))*/
+				;
 	}
 
 }

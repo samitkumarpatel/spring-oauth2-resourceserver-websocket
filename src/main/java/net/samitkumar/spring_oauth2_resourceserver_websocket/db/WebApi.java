@@ -63,8 +63,9 @@ public class WebApi {
 
     @SneakyThrows
     private ServerResponse saveUserMessage(ServerRequest request) {
+        System.out.println("##########"+request.principal().get().getName());
         var me = request.principal().orElseThrow().getName();
-        var user = userRepository.findUserByUsername(me).orElseThrow();
+        var user = userRepository.findUserByUsername(me).orElseThrow(() -> new RuntimeException("User not found"));
         var userMessageRequest = request.body(UserMessage.class);
         var userMessage = new UserMessage(null, user.id(), userMessageRequest.receiverId(), userMessageRequest.content(), null, null);
         return ServerResponse
