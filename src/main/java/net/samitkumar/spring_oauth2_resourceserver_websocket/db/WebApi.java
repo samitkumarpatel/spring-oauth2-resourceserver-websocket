@@ -2,6 +2,7 @@ package net.samitkumar.spring_oauth2_resourceserver_websocket.db;
 
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.function.RouterFunction;
@@ -11,6 +12,7 @@ import org.springframework.web.servlet.function.ServerResponse;
 
 import java.util.Map;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class WebApi {
@@ -44,9 +46,10 @@ public class WebApi {
         var me = request.principal().orElseThrow().getName();
         var meId = userRepository.findUserByUsername(me).orElseThrow().id();
         var uId = Long.parseLong(request.pathVariable("uId"));
-        return ServerResponse.ok().body(
-                userMessageRepository.findUserMessageBySenderIdAndReceiverIdOrderByCreatedAt(meId, uId)
-        );
+        log.info("Getting conversation between meId: {} and uId: {}", meId, uId);
+        var messages = userMessageRepository.findMessagesBetweenUsers(meId, uId);
+        System.out.println("##########"+messages);
+        return ServerResponse.ok().body(messages);
     }
 
     @SneakyThrows

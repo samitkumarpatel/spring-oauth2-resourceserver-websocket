@@ -10,18 +10,13 @@ import java.util.Optional;
 
 public interface UserMessageRepository extends ListCrudRepository<UserMessage, Long> {
 
-    List<UserMessage> findUserMessageBySenderIdAndReceiverIdOrderByCreatedAt(Long senderId, Long receiverId);
 
     @Query("""
-        SELECT m.id, u1.id AS senderId, u2.id AS receiverId, m.content, m.created_at, m.is_read
-        FROM messages m
-        JOIN users u1 ON m.sender_id = u1.id
-        JOIN users u2 ON m.receiver_id = u2.id
-        WHERE (m.sender_id = :userId1 AND m.receiver_id = :userId2)
-           OR (m.sender_id = :userId2 AND m.receiver_id = :userId1)
-        ORDER BY m.created_at
+        SELECT * FROM messages WHERE (sender_id = :senderId AND receiver_id = :receiverId)
+         OR (sender_id = :receiverId AND receiver_id = :senderId)
+         ORDER BY created_at ASC
     """)
-    List<UserMessage> findMessagesBetweenUsers(@Param("userId1") Long userId1, @Param("userId2") Long userId2);
+    List<UserMessage> findMessagesBetweenUsers(Long senderId, Long receiverId);
 
     @Query("""
         SELECT COUNT(*)
