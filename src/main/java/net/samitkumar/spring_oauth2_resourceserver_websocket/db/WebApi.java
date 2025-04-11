@@ -26,8 +26,8 @@ public class WebApi {
                 .path("/message", builder -> builder
                         .POST("", this::saveUserMessage)
                         .PATCH("/{messageId}", this::updateUserMessage)
-                        .GET("/conversation/{uId}", this::getUserConversation)
-                        .GET("/conversation/{uId}/unread", this::getUnreadMessageCount)
+                        .GET("/conversation/{targetUserId}", this::getUserConversation)
+                        .GET("/conversation/{targetUserId}/unread", this::getUnreadMessageCount)
                 )
                 .build();
     }
@@ -35,19 +35,19 @@ public class WebApi {
     private ServerResponse getUnreadMessageCount(ServerRequest request) {
         var me = request.principal().orElseThrow().getName();
         var meId = userRepository.findUserByUsername(me).orElseThrow().id();
-        var uId = Long.parseLong(request.pathVariable("uId"));
+        var targetUserId = Long.parseLong(request.pathVariable("targetUserId"));
         return ServerResponse.ok()
                 .body(
-                        Map.of("count", userMessageRepository.countUnreadMessage(meId, uId))
+                        Map.of("count", userMessageRepository.countUnreadMessage(meId, targetUserId))
                 );
     }
 
     private ServerResponse getUserConversation(ServerRequest request) {
         var me = request.principal().orElseThrow().getName();
         var meId = userRepository.findUserByUsername(me).orElseThrow().id();
-        var uId = Long.parseLong(request.pathVariable("uId"));
-        log.info("Getting conversation between meId: {} and uId: {}", meId, uId);
-        var messages = userMessageRepository.findMessagesBetweenUsers(meId, uId);
+        var targetUserId = Long.parseLong(request.pathVariable("targetUserId"));
+        log.info("Getting conversation between meId: {} and uId: {}", meId, targetUserId);
+        var messages = userMessageRepository.findMessagesBetweenUsers(meId, targetUserId);
         System.out.println("##########"+messages);
         return ServerResponse.ok().body(messages);
     }
@@ -66,7 +66,6 @@ public class WebApi {
 
     @SneakyThrows
     private ServerResponse saveUserMessage(ServerRequest request) {
-        System.out.println("##########"+request.principal().get().getName());
         var me = request.principal().orElseThrow().getName();
         var user = userRepository.findUserByUsername(me).orElseThrow(() -> new RuntimeException("User not found"));
         var userMessageRequest = request.body(UserMessage.class);

@@ -60,7 +60,11 @@ class SpringOauth2ResourceserverWebsocketApplicationTests {
 						.forEach(System.out::println),
 				() -> userMessageRepository
 						.findMessagesBetweenUsers(1L, 2L)
-						.forEach(System.out::println)
+						.forEach(System.out::println),
+				() -> {
+					var count = userMessageRepository.countUnreadMessage(1L, 2L);
+					System.out.println("##Count:## " + count);
+				}
 		);
 
 	}
@@ -75,14 +79,14 @@ class SpringOauth2ResourceserverWebsocketApplicationTests {
 								.with(SecurityMockMvcRequestPostProcessors
 										.jwt()
 										.jwt(jwt -> jwt.claims(claims -> {
-											claims.put("sub", "Bret");
+											claims.put("sub", "Antonette");
 											claims.put("authorities", List.of("ROLE_USER"));
 										}))
 								)
 								.contentType("application/json")
 								.content("""
 								{
-									"receiverId": 2,
+									"receiverId": 1,
 									"content": "Hello from api"
 								}
 								""")
@@ -108,11 +112,26 @@ class SpringOauth2ResourceserverWebsocketApplicationTests {
 						.andExpect(MockMvcResultMatchers.status().isOk())
 						/*.andExpect(MockMvcResultMatchers.content().json("""
 							[
-								{"id":2,"senderId":1,"receiverId":2,"content":"How are you?","createdAt":"2025-04-10T16:49:43.707061","isRead":false},
-								{"id":3,"senderId":2,"receiverId":1,"content":"I am fine","createdAt":"2025-04-10T16:49:43.707061","isRead":false},
-								{"id":1,"senderId":1,"receiverId":2,"content":"Hello","createdAt":"2025-04-10T16:49:43.707061","isRead":true},
-								{"id":4,"senderId":1,"receiverId":2,"content":"Hello from api","createdAt":"2025-04-10T16:49:43.82271","isRead":false}
+								{"id":2,"senderId":1,"receiverId":2,"content":"How are you?","createdAt":"2025-04-11T09:30:21.550019","isRead":false},
+								{"id":3,"senderId":2,"receiverId":1,"content":"I am fine","createdAt":"2025-04-11T09:30:21.550019","isRead":false},
+								{"id":1,"senderId":1,"receiverId":2,"content":"Hello","createdAt":"2025-04-11T09:30:21.550019","isRead":true},
+								{"id":4,"senderId":1,"receiverId":2,"content":"Hello from api","createdAt":"2025-04-11T09:30:21.674023","isRead":false}
 							]
+						"""))*/
+				,
+				() -> mockMvc.perform(MockMvcRequestBuilders
+								.get("/message/conversation/2/unread")
+								.with(SecurityMockMvcRequestPostProcessors
+										.jwt()
+										.jwt(jwt -> jwt.claims(claims -> {
+											claims.put("sub", "Bret");
+											claims.put("authorities", List.of("ROLE_USER"));
+										}))
+								)
+								.accept("application/json")
+						)
+						.andExpect(MockMvcResultMatchers.status().isOk())
+						/*.andExpect(MockMvcResultMatchers.content().json("""
 						"""))*/
 		);
 

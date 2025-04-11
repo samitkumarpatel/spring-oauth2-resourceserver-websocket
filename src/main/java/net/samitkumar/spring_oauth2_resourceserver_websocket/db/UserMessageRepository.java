@@ -21,7 +21,7 @@ public interface UserMessageRepository extends ListCrudRepository<UserMessage, L
     @Query("""
         SELECT COUNT(*)
         FROM messages m
-        WHERE m.sender_id = :me AND m.receiver_id = :you AND m.is_read = FALSE
+        WHERE m.receiver_id = :me AND m.sender_id = :you AND m.is_read = FALSE
     """)
     Long countUnreadMessage(@Param("me") Long me, @Param("you") Long you);
 
