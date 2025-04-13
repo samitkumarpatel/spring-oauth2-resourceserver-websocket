@@ -1,7 +1,11 @@
 package net.samitkumar.spring_oauth2_resourceserver_websocket;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import net.samitkumar.spring_oauth2_resourceserver_websocket.db.UserMessage;
+import net.samitkumar.spring_oauth2_resourceserver_websocket.db.UserMessageRepository;
+import net.samitkumar.spring_oauth2_resourceserver_websocket.db.UserRepository;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.security.servlet.PathRequest;
@@ -33,10 +37,12 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
@@ -44,6 +50,7 @@ import org.springframework.web.socket.messaging.SessionConnectEvent;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
 import java.security.Principal;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Objects;
 
@@ -60,13 +67,39 @@ public class SpringOauth2ResourceserverWebsocketApplication {
 	@EventListener
 	public void onSessionConnect(SessionConnectEvent event) {
 		var user = Objects.requireNonNull(event.getUser()).getName();
-		simpMessagingTemplate.convertAndSend("/topic/public", new OutboundMessage(Event.CONNECT, new Payload("User " + user + " joined", "ALL", "SYSTEM")));
+		simpMessagingTemplate.convertAndSend(
+				"/topic/public",
+				new OutboundMessage(
+						Event.CONNECT,
+						new UserMessage(null, 0L, 0L, "User " + user + " joined", LocalDateTime.now(), false)
+				)
+		);
 	}
 
 	@EventListener
 	public void onSessionDisconnect(SessionDisconnectEvent event) {
 		var user = Objects.requireNonNull(event.getUser()).getName();
-		simpMessagingTemplate.convertAndSend("/topic/public", new OutboundMessage(Event.DISCONNECT, new Payload("User " + user + " left", "ALL", "SYSTEM")));
+		simpMessagingTemplate.convertAndSend(
+				"/topic/public",
+				new OutboundMessage(
+						Event.DISCONNECT,
+						new UserMessage(null, 0L, 0L, "User " + user + " left", LocalDateTime.now(), false)
+				)
+		);
+	}
+
+	@Bean
+	CorsFilter corsFilter() {
+		CorsConfiguration config = new CorsConfiguration();
+		config.setAllowCredentials(true);
+		config.addAllowedOriginPattern("*");
+		config.addAllowedHeader("*");
+		config.addAllowedMethod("*");
+
+		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+		source.registerCorsConfiguration("/**", config);
+
+		return new CorsFilter(source);
 	}
 }
 
@@ -170,8 +203,7 @@ enum Event {
 	MESSAGE_TO_GROUP
 }
 record InboundMessage(String message, String from, String to) {}
-record OutboundMessage(Event event, Payload payload) {}
-record Payload(String message, String from, String to) {}
+record OutboundMessage(Event event, @JsonProperty("payload") UserMessage payload) {}
 
 @Controller
 @Slf4j
@@ -179,9 +211,11 @@ record Payload(String message, String from, String to) {}
 class WebSocketController {
 	final SimpMessagingTemplate simpMessagingTemplate;
 	final JwtDecoder jwtDecoder;
+	final UserMessageRepository userMessageRepository;
+	final UserRepository userRepository;
 
 	@GetMapping("/who-am-i")
-	@CrossOrigin(originPatterns = "*")
+	//@CrossOrigin(originPatterns = "*")
 	@ResponseBody
 	Map<String, Object> whoAmI(Principal principal) {
 		var jwt = (Jwt) ((JwtAuthenticationToken) principal).getToken();
@@ -194,7 +228,7 @@ class WebSocketController {
 		log.info("####Public Message {} from {}", message, principal);
 		return new OutboundMessage(
 				Event.MESSAGE_TO_ALL,
-				new Payload(message.message(), principal.getName(), "ALL")
+				new UserMessage(null, 0L, 0L, message.message(), LocalDateTime.now(), false)
 		);
 	}
 
@@ -202,13 +236,19 @@ class WebSocketController {
 	@SendToUser("/queue/private")
 	public OutboundMessage processPrivateMessage(Principal principal, InboundMessage message) {
 		log.info("####Private Message {} from {}", message, principal);
+
+		var meId = userRepository.findUserByUsername(principal.getName()).orElseThrow().id();
+		var receiverId = userRepository.findUserByUsername(message.to()).orElseThrow().id();
+		var dbResponse = userMessageRepository.save(new UserMessage(null, meId, receiverId, message.message(), null, false));
+
 		var messageToSender = new OutboundMessage(
 				Event.MESSAGE_TO_USER,
-				new Payload(message.message(), principal.getName(), principal.getName())
+				dbResponse
 		);
+
 		var messageToReceiver = new OutboundMessage(
 				Event.MESSAGE_FROM_USER,
-				new Payload(message.message(), principal.getName(), message.to())
+				dbResponse
 		);
 		simpMessagingTemplate.convertAndSendToUser(message.to(), "/queue/private", messageToReceiver);
 		return messageToSender;

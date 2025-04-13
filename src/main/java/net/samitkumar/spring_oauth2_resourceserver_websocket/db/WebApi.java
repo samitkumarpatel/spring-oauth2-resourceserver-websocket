@@ -5,6 +5,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.stereotype.Component;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.servlet.function.RouterFunction;
 import org.springframework.web.servlet.function.RouterFunctions;
 import org.springframework.web.servlet.function.ServerRequest;
@@ -20,6 +21,7 @@ public class WebApi {
     final UserRepository userRepository;
 
     @Bean
+    @CrossOrigin(originPatterns = "*")
     RouterFunction<ServerResponse> routerFunction() {
         return RouterFunctions
                 .route()
@@ -38,7 +40,9 @@ public class WebApi {
         var targetUserId = Long.parseLong(request.pathVariable("targetUserId"));
         return ServerResponse.ok()
                 .body(
-                        Map.of("count", userMessageRepository.countUnreadMessage(meId, targetUserId))
+                        Map.of(
+                                "count", userMessageRepository.countUnreadMessage(meId, targetUserId)
+                        )
                 );
     }
 
