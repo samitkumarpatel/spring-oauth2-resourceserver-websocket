@@ -1,0 +1,171 @@
+openapi: 3.0.3
+info:
+  title: Chat Application API
+  version: 1.0.0
+
+paths:
+  /message/conversation/{targetUserId}:
+    get:
+      summary: Get conversation with another user
+      parameters:
+        - in: path
+          name: targetUserId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of messages in the conversation
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserMessage'
+
+  /message/{messageId}/read:
+    patch:
+      summary: Mark a message as read
+      parameters:
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Message marked as read
+
+  /message/{messageId}:
+    patch:
+      summary: Update a message's content
+      parameters:
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+      responses:
+        '200':
+          description: Message updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserMessage'
+
+    delete:
+      summary: Delete a message
+      parameters:
+        - in: path
+          name: messageId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '204':
+          description: Message deleted
+
+  /message/conversation/{targetUserId}/unread:
+    get:
+      summary: Get unread message count with a user
+      parameters:
+        - in: path
+          name: targetUserId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Unread message count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    example: 10
+
+  /who-am-i:
+    get:
+      summary: Get JWT claims of current user
+      responses:
+        '200':
+          description: JWT claims
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+components:
+  schemas:
+    UserMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        from:
+          type: integer
+        to:
+          type: integer
+        content:
+          type: string
+          description: Message content
+          example: "Hello there"
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        isRead:
+          type: boolean
+          readOnly: true
+
+    OutboundMessage:
+      type: object
+      properties:
+        event:
+          type: string
+          enum:
+            - CONNECT
+            - DISCONNECT
+            - MESSAGE_TO_ALL
+            - MESSAGE_FROM_USER
+            - MESSAGE_FROM_GROUP
+            - MESSAGE_TO_USER
+            - MESSAGE_TO_GROUP
+        payload:
+          $ref: '#/components/schemas/UserMessage'
+
+    WebSocketInputMessage:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Hello from WebSocket!"
+        to:
+          type: string
+          example: "john.doe"
+
+x-websocket:
+  endpoint: /stomp-endpoint
+  subscriptions:
+    private: /user/queue/private
+    public: /topic/public
+  sends:
+    private: /app/chat/private
+    public: /app/chat
+  messagePayload:
+    $ref: '#/components/schemas/OutboundMessage'
+  messageInput:
+    $ref: '#/components/schemas/WebSocketInputMessage'
