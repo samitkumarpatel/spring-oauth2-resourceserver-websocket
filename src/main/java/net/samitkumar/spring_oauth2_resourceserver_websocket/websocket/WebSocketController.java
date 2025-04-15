@@ -25,17 +25,16 @@ import java.util.Map;
 @RequiredArgsConstructor
 class WebSocketController {
     final SimpMessagingTemplate simpMessagingTemplate;
-    final JwtDecoder jwtDecoder;
     final UserMessageRepository userMessageRepository;
     final UserRepository userRepository;
 
-    @GetMapping("/who-am-i")
+    /*@GetMapping("/who-am-i")
     //@CrossOrigin(originPatterns = "*")
     @ResponseBody
     Map<String, Object> whoAmI(Principal principal) {
         var jwt = (Jwt) ((JwtAuthenticationToken) principal).getToken();
         return jwt.getClaims();
-    }
+    }*/
 
     @MessageMapping("/chat")
     @SendTo("/topic/public")

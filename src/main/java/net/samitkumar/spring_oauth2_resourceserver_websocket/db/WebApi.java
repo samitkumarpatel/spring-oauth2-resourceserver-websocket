@@ -3,7 +3,10 @@ package net.samitkumar.spring_oauth2_resourceserver_websocket.db;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import net.samitkumar.spring_oauth2_resourceserver_websocket.cache.UserStatusRepository;
 import org.springframework.context.annotation.Bean;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.servlet.function.RouterFunction;
@@ -19,19 +22,54 @@ import java.util.Map;
 public class WebApi {
     final UserMessageRepository userMessageRepository;
     final UserRepository userRepository;
+    final UserStatusRepository userStatusRepository;
 
     @Bean
     @CrossOrigin(originPatterns = "*")
     RouterFunction<ServerResponse> routerFunction() {
         return RouterFunctions
                 .route()
+                .path("/who-am-i", builder -> builder
+                        .GET("", this::whoAmI)
+                )
+                .path("/online-status", builder -> builder
+                        .GET("", this::allOnlineUsers)
+                        .GET("/{id}", this::onlineStatusById)
+                )
                 .path("/message", builder -> builder
-                        .POST("", this::saveUserMessage)
-                        .PATCH("/{messageId}", this::updateUserMessage)
+                        //.POST("", this::saveUserMessage)
+                        .PATCH("/{messageId}", this::patchMessage)
+                        .DELETE("/{messageId}", this::deleteMessage)
+                        .PATCH("/{messageId}/read", this::markUserMessageRead)
                         .GET("/conversation/{targetUserId}", this::getUserConversation)
                         .GET("/conversation/{targetUserId}/unread", this::getUnreadMessageCount)
                 )
                 .build();
+    }
+
+    private ServerResponse onlineStatusById(ServerRequest request) {
+        var id = request.pathVariable("id");
+        return ServerResponse.ok().body(userStatusRepository.findById(id));
+    }
+
+    private ServerResponse allOnlineUsers(ServerRequest request) {
+        return ServerResponse.ok().body(userStatusRepository.findAll());
+    }
+
+    private ServerResponse whoAmI(ServerRequest request) {
+        var principal = request
+                .principal()
+                .orElseThrow();
+        var jwt = (Jwt) ((JwtAuthenticationToken) principal).getToken();
+        return ServerResponse.ok().body(jwt.getClaims());
+    }
+
+    private ServerResponse deleteMessage(ServerRequest request) {
+        return ServerResponse.noContent().build();
+    }
+
+    private ServerResponse patchMessage(ServerRequest request) {
+        return ServerResponse.noContent().build();
     }
 
     private ServerResponse getUnreadMessageCount(ServerRequest request) {
@@ -57,7 +95,7 @@ public class WebApi {
     }
 
     @SneakyThrows
-    private ServerResponse updateUserMessage(ServerRequest request) {
+    private ServerResponse markUserMessageRead(ServerRequest request) {
         var requestUserMessageRequest = request.body(UserMessage.class);
         userMessageRepository.findById(requestUserMessageRequest.id())
                 .ifPresentOrElse(userMessage -> {
