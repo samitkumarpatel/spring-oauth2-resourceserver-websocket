@@ -32,7 +32,7 @@ public class WebApi {
                 .path("/who-am-i", builder -> builder
                         .GET("", this::whoAmI)
                 )
-                .path("/online-status", builder -> builder
+                .path("/user-status", builder -> builder
                         .GET("", this::allOnlineUsers)
                         .GET("/{id}", this::onlineStatusById)
                 )

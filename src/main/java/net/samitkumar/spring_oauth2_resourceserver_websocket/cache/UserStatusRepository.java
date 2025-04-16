@@ -14,18 +14,18 @@ import java.util.Objects;
 public class UserStatusRepository {
     final RedisTemplate<String, Object> redisTemplate;
 
-    public List<OnlineUser> findAll() {
+    public List<UserStatus> findAll() {
         return redisTemplate.keys("*").stream()
-                .map(key -> (OnlineUser) redisTemplate.opsForValue().get(key))
+                .map(key -> (UserStatus) redisTemplate.opsForValue().get(key))
                 .toList();
     }
 
-    public void save(OnlineUser onlineUser) {
-        redisTemplate.opsForValue().set(onlineUser.id(), onlineUser);
+    public void save(UserStatus userStatus) {
+        redisTemplate.opsForValue().set(userStatus.id(), userStatus);
     }
 
     public Map findById(String id) {
-        var onlineUser = (OnlineUser) redisTemplate.opsForValue().get(id);
+        var onlineUser = (UserStatus) redisTemplate.opsForValue().get(id);
         if(Objects.nonNull(onlineUser)) {
             return new ObjectMapper().convertValue(onlineUser, Map.class);
         }

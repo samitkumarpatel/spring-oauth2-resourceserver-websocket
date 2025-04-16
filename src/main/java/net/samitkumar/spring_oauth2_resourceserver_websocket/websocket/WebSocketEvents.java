@@ -2,7 +2,7 @@ package net.samitkumar.spring_oauth2_resourceserver_websocket.websocket;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import net.samitkumar.spring_oauth2_resourceserver_websocket.cache.OnlineUser;
+import net.samitkumar.spring_oauth2_resourceserver_websocket.cache.UserStatus;
 import net.samitkumar.spring_oauth2_resourceserver_websocket.cache.UserStatusRepository;
 import net.samitkumar.spring_oauth2_resourceserver_websocket.db.UserMessage;
 import net.samitkumar.spring_oauth2_resourceserver_websocket.db.UserRepository;
@@ -29,9 +29,8 @@ public class WebSocketEvents {
         var dbUser = userRepository.findUserByUsername(user).orElseThrow();
 
         //mark the user online
-        userStatusRepository.save(new OnlineUser(
+        userStatusRepository.save(new UserStatus(
                 String.valueOf(dbUser.id()),
-                dbUser.id(),
                 dbUser.username(),
                 true)
         );
@@ -51,9 +50,8 @@ public class WebSocketEvents {
         var dbUser = userRepository.findUserByUsername(user).orElseThrow();
 
         //mark the user offline
-        userStatusRepository.save(new OnlineUser(
+        userStatusRepository.save(new UserStatus(
                 String.valueOf(dbUser.id()),
-                dbUser.id(),
                 dbUser.username(),
                 false)
         );
