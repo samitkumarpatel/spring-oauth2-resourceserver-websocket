@@ -27,19 +27,18 @@ public class WebSocketEvents {
     public void onSessionConnect(SessionConnectEvent event) {
         var user = Objects.requireNonNull(event.getUser()).getName();
         var dbUser = userRepository.findUserByUsername(user).orElseThrow();
-
-        //mark the user online
-        userStatusRepository.save(new UserStatus(
+        var userStatus = new UserStatus(
                 String.valueOf(dbUser.id()),
                 dbUser.username(),
-                true)
-        );
+                true);
+        //mark the user online
+        userStatusRepository.save(userStatus);
         //send a websocket message to all users
         simpMessagingTemplate.convertAndSend(
                 "/topic/public",
                 new OutboundMessage(
                         Event.CONNECT,
-                        new UserMessage(null, 0L, 0L, "User " + user + " joined", LocalDateTime.now(), false)
+                        userStatus
                 )
         );
     }
@@ -48,20 +47,19 @@ public class WebSocketEvents {
     public void onSessionDisconnect(SessionDisconnectEvent event) {
         var user = Objects.requireNonNull(event.getUser()).getName();
         var dbUser = userRepository.findUserByUsername(user).orElseThrow();
-
-        //mark the user offline
-        userStatusRepository.save(new UserStatus(
+        var userStatus = new UserStatus(
                 String.valueOf(dbUser.id()),
                 dbUser.username(),
-                false)
-        );
+                false);
+        //mark the user offline
+        userStatusRepository.save(userStatus);
 
         //send a websocket message to all users
         simpMessagingTemplate.convertAndSend(
                 "/topic/public",
                 new OutboundMessage(
                         Event.DISCONNECT,
-                        new UserMessage(null, 0L, 0L, "User " + user + " left", LocalDateTime.now(), false)
+                        userStatus
                 )
         );
     }

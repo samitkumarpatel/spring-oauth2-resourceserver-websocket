@@ -9,7 +9,7 @@ import org.springframework.data.relational.core.mapping.Table;
 import java.time.LocalDateTime;
 
 @Table("messages")
-public record UserMessage(
+public record UserMessage (
         @Id Long id,
         @JsonProperty("from") Long senderId,
         @JsonProperty("to") Long receiverId,
