@@ -2,6 +2,7 @@ package net.samitkumar.spring_oauth2_resourceserver_websocket.websocket;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.messaging.Message;
@@ -27,6 +28,13 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @RequiredArgsConstructor
 @Slf4j
 class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer {
+
+    @Value("${spring.rabbitmq.relay.host}")
+    private String relayHost;
+
+    @Value("${spring.rabbitmq.relay.port}")
+    private int relayPort;
+
     private final JwtDecoder jwtDecoder;
 
     @Override
@@ -39,8 +47,14 @@ class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/queue/", "/topic/");
+        //registry.enableSimpleBroker("/queue/", "/topic/");
         // STOMP messages whose destination header begins with /app are routed to @MessageMapping methods in @Controller classes
+        registry.enableStompBrokerRelay("/queue/", "/topic/")
+                .setRelayHost(relayHost)
+                .setRelayPort(relayPort)
+                .setClientLogin("guest")
+                .setClientPasscode("guest");
+
         registry.setApplicationDestinationPrefixes("/app");
         registry.setUserDestinationPrefix("/user");
     }
