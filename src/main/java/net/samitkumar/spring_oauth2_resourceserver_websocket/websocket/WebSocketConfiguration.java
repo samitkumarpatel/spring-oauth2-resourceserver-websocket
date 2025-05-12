@@ -2,6 +2,7 @@ package net.samitkumar.spring_oauth2_resourceserver_websocket.websocket;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
 import org.springframework.messaging.Message;
@@ -10,9 +11,11 @@ import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.messaging.simp.stomp.StompReactorNettyCodec;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.messaging.tcp.reactor.ReactorNettyTcpClient;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -22,11 +25,23 @@ import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBr
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
+import java.net.InetSocketAddress;
+
 @Configuration
 @EnableWebSocketMessageBroker
 @RequiredArgsConstructor
 @Slf4j
 class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer {
+
+    @Value("${spring.rabbitmq.relay.host}")
+    private String relayHost;
+
+    @Value("${spring.rabbitmq.relay.port}")
+    private int relayPort;
+
+    @Value("${spring.rabbitmq.enabled}")
+    private boolean rabbitEnabled;
+
     private final JwtDecoder jwtDecoder;
 
     @Override
@@ -39,10 +54,27 @@ class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/queue/", "/topic/");
-        // STOMP messages whose destination header begins with /app are routed to @MessageMapping methods in @Controller classes
+
+        if(rabbitEnabled) {
+            registry.enableStompBrokerRelay("/queue/", "/topic/")
+                //.setTcpClient(createTcpClient())
+                .setRelayHost(relayHost)
+                .setRelayPort(relayPort)
+                .setClientLogin("guest")
+                .setClientPasscode("guest");
+        } else {
+            registry.enableSimpleBroker("/queue/", "/topic/");
+        }
+
+
         registry.setApplicationDestinationPrefixes("/app");
         registry.setUserDestinationPrefix("/user");
+    }
+
+    private ReactorNettyTcpClient<byte[]> createTcpClient() {
+        return new ReactorNettyTcpClient<>(
+                client -> client.remoteAddress(() -> new InetSocketAddress(0)),
+                new StompReactorNettyCodec());
     }
 
     @Override

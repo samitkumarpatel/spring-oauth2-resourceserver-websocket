@@ -1,0 +1,19 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672" #Admin console access
+      - "15674:15674" #rabbit_web_stomp
+      - "61613:61613" # STOMP
+      - "1883:1883" #MQTT
+#    environment:
+#      - RABBITMQ_PLUGINS_DIR=/tmp/plugins
+    volumes:
+      - ./rabbitmq/plugins:/etc/rabbitmq/enabled_plugins:rw
+#    volumes:
+#      - type: bind
+#        source: ./rabbitmq/enabled_plugins
+#        target:  /etc/rabbitmq/enabled_plugins

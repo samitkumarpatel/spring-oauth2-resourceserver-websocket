@@ -4,6 +4,15 @@ server:
 spring:
   application:
     name: spring-oauth2-resourceserver-websocket
+  rabbitmq:
+    enabled: true
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    relay:
+      host: ${RELAY_HOST:localhost}
+      port: ${RELAY_PORT:61613}
   security:
     oauth2:
       resourceserver:
